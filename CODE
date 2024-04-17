@@ -1,0 +1,162 @@
+#include <Wire.h>
+#include "MAX30100_PulseOximeter.h"
+#include <SPI.h>
+#include <Wire.h>
+#include "Adafruit_GFX.h"
+#include "Adafruit_SSD1306.h"
+#include "OakOLED.h"
+
+
+#define REPORTING_PERIOD_MS   1000
+#define UV_SENSOR_PIN         36
+
+
+OakOLED oled;
+PulseOximeter pox;
+
+
+uint32_t  tsLastReport = 0;
+
+
+void onBeatDetected() 
+{
+  Serial.println("Beat!");
+}
+
+
+void setup() 
+{
+  Serial.begin(9600);
+  pinMode(UV_SENSOR_PIN, INPUT);
+  oled.begin();
+  Serial.print("Health monitor...");
+
+
+  if (!pox.begin()) 
+{
+    Serial.println("FAILED");
+    while (1);
+  } 
+else {
+    Serial.println("SUCCESS");
+  }
+  pox.setOnBeatDetectedCallback(onBeatDetected);
+}
+
+
+void loop() 
+{
+  pox.update();
+  static uint32_t  lastUVReport = 0;
+
+
+  if (millis() - tsLastReport > REPORTING_PERIOD_MS) 
+{
+    Serial.println("Heart BPM:");
+    Serial.println(pox.getHeartRate());
+    Serial.println("-----");
+    Serial.println("Oxygen Percent:");
+    Serial.println(pox.getSpO2());
+    Serial.print("%");
+
+
+    oled.clearDisplay();
+    oled.setTextSize(1);
+    oled.setTextColor(1);
+    oled.setCursor(0, 0);
+    oled.println("Heart BPM:");
+
+
+    oled.setTextSize(1);
+    oled.setTextColor(1);
+    oled.setCursor(0, 10);
+    oled.println(pox.getHeartRate());
+
+
+    oled.setTextSize(1);
+    oled.setTextColor(1);
+    oled.setCursor(0, 23);
+    oled.println("Spo2:");
+
+
+    oled.setTextSize(1);
+    oled.setTextColor(1);
+    oled.setCursor(0, 33);
+    oled.println(pox.getSpO2());
+
+
+    tsLastReport = millis();
+  }
+
+
+  if (millis() - lastUVReport > REPORTING_PERIOD_MS) {
+    float uvValue = uv();
+    Serial.println("UV Radiation:");
+    Serial.println(uvValue);
+
+
+    oled.setTextSize(1);
+    oled.setTextColor(1);
+    oled.setCursor(0, 46);
+    oled.println("UV Radiation:");
+
+
+    oled.setTextSize(1);
+    oled.setTextColor(1);
+    oled.setCursor(0, 56);
+    oled.println(uvValue);
+    oled.display();
+
+
+    String  precaution_message;
+
+
+    if (uvValue <= 750) 
+{
+      precaution_message = "UV radiation level is low. No precautions needed.";
+    } 
+else if (uvValue > 770 && uvValue <= 1100) {
+      precaution_message = "UV radiation level is low to moderate. Apply sunscreen and Wear sunglasses.";
+    } 
+else if (uvValue > 1100 && uvValue <= 1800) {
+      precaution_message = "UV radiation level is moderate. Apply sunscreen and Wear sunglasses.";
+    } 
+else if (uvValue > 1800 && uvValue <= 2400) 
+{
+      precaution_message = "UV radiation level is moderate to high. Seek shade, wear protective clothing, sunglasses, and apply sunscreen.";
+    } 
+else if (uvValue > 2400 && uvValue <= 3000) 
+{
+      precaution_message = "Safety eyewear, UV face shields, long-sleeved, tightly woven clothing that covers much of the body and gloves";
+    } 
+else if (uvValue > 3000 && uvValue <= 3600) 
+{
+      precaution_message = "UV radiation level is high to very high. Avoid direct exposure, use protective equipment, Avoid being outside during peak hours, follow safety guidelines during working.";
+    } 
+else {
+      precaution_message = "UV radiation level is extremely high. Stay indoors if possible. Avoid being outside during peak hours. Wear protective clothing, sunglasses, and apply high SPF sunscreen.";
+    }
+
+
+    Serial.print(" Precaution: ");
+    Serial.println(precaution_message);
+    
+    lastUVReport = millis();
+  }
+}
+
+
+float uv() 
+{
+  float sensorValue = analogRead(UV_SENSOR_PIN);
+  float sensorVoltage = sensorValue / 4095.0 * 3.3;
+
+
+  Serial.print("UV sensor reading = ");
+  Serial.print(sensorValue);
+  Serial.println("");
+  Serial.print("UV sensor voltage = ");
+  Serial.print(sensorVoltage);
+  Serial.println(" V");
+  return sensorValue; // Return sensor value
+}
